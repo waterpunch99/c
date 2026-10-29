@@ -1,0 +1,29 @@
+{
+  "run_config": {"kafka_partitions": 32, "operator_cpu_sample_every": 10},
+  "experiment_3": {
+    "cpu_work_iterations": 200000, "keyed_cpu_work_iterations": 1000,
+    "cases": {
+      "low_baseline": {"source": 2, "parse": 2, "heavy": 2, "aggregation": 2, "sink": 2},
+      "uniform_high": {"source": 8, "parse": 8, "heavy": 8, "aggregation": 8, "sink": 8},
+      "bottleneck_focused": {"source": 2, "parse": 2, "heavy": 8, "aggregation": 4, "sink": 2}
+    }
+  },
+  "experiment_4": {"cpu_work_iterations": 0, "keyed_cpu_work_iterations": 200000},
+  "smoke": {
+    "parallelisms": [2, 4], "distributions": ["uniform", "skewed"], "repetitions": 1,
+    "target_rate": 100, "random_order": false, "order_seed": 42,
+    "run_overrides": {"warmup_seconds": 3, "measurement_seconds": 10, "preflight_seconds": 5,
+      "sample_interval_seconds": 2, "drain_timeout_seconds": 30, "checkpoint_interval_ms": 1000}
+  },
+  "full": {
+    "parallelisms": [2, 4, 8, 16], "distributions": ["uniform", "skewed"], "repetitions": 3,
+    "target_rate": 1000, "random_order": true, "order_seed": 42, "run_overrides": {}
+  },
+  "evidence_thresholds": {
+    "minimum_busy_ms_per_second": 750, "maximum_backpressure_ms_per_second": 150,
+    "minimum_busy_margin_ms_per_second": 100, "maximum_subtask_rate_cv": 0.2,
+    "maximum_cpu_quota_utilization": 0.95, "maximum_throttled_period_ratio": 0.1,
+    "maximum_hot_ratio_absolute_error": 0.05, "minimum_distribution_records": 100,
+    "maximum_partition_total_variation": 0.02, "precheck_minimum_sink_ratio": 0.98
+  }
+}

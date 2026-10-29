@@ -1,0 +1,28 @@
+# 현재 구현의 한계
+
+- Phase 1 Smoke는 실제 계통·설정·정확성을 검증한다. Capacity, 장시간 안정성, p99 SLO, Knee Point, 병목 Operator를 측정했다고 해석할 수 없다.
+- 고정 자원에서 병렬도만 늘리면 CPU quota를 공유한다. Slot 수/Operator P 합은 실제 CPU 할당이나 실사용 Slot이 아니다. TM=2 CPU, Slot=16은 Oversubscription 조건을 허용한다.
+- 하나의 Hot Key는 하나의 Keyed Subtask에 속한다. Phase 4는 생성/ACK Hot 수와 실제 Aggregation 코호트 Counter를 대조해 처리된 Hot Key의 Subtask를 관측한다. 설계/예상 hash를 실측 배치로 출력하지 않으며 단일 Subtask 배치가 곧 성능 병목 증명은 아니다.
+- Python/librdkafka 고부하 발행 성능은 미검증이다. Phase 2 Preflight는 같은 Rate/Schema/분포를 검사하지만 동시 실행 시 Flink/계측과의 경합까지 보장하지 않는다. 실행 중 Producer 속도·CPU/Throttle·Queue를 다시 관측한다.
+- Producer는 단일 worker, userId와 독립적인 명시적 round-robin/random Partition 전략을 제공한다. 다중 worker와 resource-scaled는 거부한다. Phase 2 Controller는 Chaining off만 지원하며 수동 Job에서는 Chaining on이 가능하다.
+- Histogram은 log2 Bucket이며 퍼센타일은 상한 근사치가 된다. Phase 2는 Subtask Bucket을 병합하고 퍼센타일을 평균하지 않는다. 샘플 수가 적거나 미처리 코호트가 남으면 p99를 해석하기 어렵다. 계측 오버헤드 비교 실험은 미실행이다.
+- Host↔Container clock probe는 offset 구간과 RTT를 기록하며 동기화/절대 Latency 정확성을 증명하지 않는다. Producer 직접 clock probe와 설정 기반 신뢰 판정을 구현했지만 Clock drift 연속 추적은 하지 않는다.
+- 정상 완료 Counter는 비트랜잭션/비체크포인트 관측값이다. Restart가 있으면 전체 유일 완료 수라고 주장하지 않는다. 기본 재시작을 끄고 Smoke에서 최대10,000개의 전체 ID Bitset을 검증한다. 대규모 ID 검증 비용·방법은 별도 설계한다.
+- State 정확성 Unit은 실제 Flink keyed harness와 Snapshot/Restore를 사용한다. 외부 Sink의 장애 시 Exactly-once를 검증하는 테스트는 아니다.
+- Source Offset·Committed Offset·LEO·pendingRecords는 서로 다른 의미이다. Source의 실제 deserialize offset+1 Gauge와 Admin LEO/Commit를 결합하지만 REST 캐시와 순차 요청의 시각 차이가 있다. 따라서 관측 backlog에는 계측 지연이 포함될 수 있다. freshness 한도 밖/음수/미등록은 null이다. 읽기 Gauge만으로 Idle Source의 전체 assignment를 증명하지 않는다. Phase5의 별도 실제 할당 콜백/Count0·Partition 전체 소유자·신선도를 함께 확인한다.
+- REST·주기 CSV, cgroup v2 CPU/Throttle/Memory/OOM, TM JVM GC 원시 지표를 구현했다. cgroup v1 환경은 미지원값/원인을 저장하며 Full 안정성 근거가 부족해진다. Prometheus/Grafana, 정확한 Subtask CPU/State cardinality는 미구현이다. Task Busy를 CPU로 대체하지 않는다.
+- Backlog 회귀의 95% 구간은 정규 근사이며 적은 표본의 Student-t 구간이나 자기상관 보정이 아니다. 한 번의 짧은 Smoke를 지속 가능 최대 Capacity로 사용하지 않는다. 최초/최종 Measurement sample 사이의 Checkpoint 증가량을 보고하므로 구간 경계의 수집 공백을 함께 해석해야 한다.
+- 단일 Broker KRaft/로컬 공유 named volume은 broker·노드 장애 실험, HA, Production 내구성 보장을 제공하지 않는다. Run별 Checkpoint 경로를 보존하며 복원하지 않는다.
+- 태그는 구체 버전이나 registry가 재게시할 가능성이 있다. 이미지 Digest와 Maven 전이 의존성 그래프를 보존하며 정확한 바이너리 재현이 필요하면 Digest pin을 사용한다.
+- 설정 기반 Sustainable 판정·실험1 Rate 탐색/고정 부하·실험2 조건부 Capacity/공식/독립 검증·실험3 Operator P 비교·실험4 Skew/Partition/Hot 배치 분석·실험5 Source/Partition 실제 할당 비교·전체 순차 Suite·반복 Summary/PNG/한국어 통합 리포트를 구현했다. 실제 장시간 Full은 미실행이며 검색/예측/검증 Full 분기는 임시 Fixture로 테스트했다. Smoke의 Rate/P를 Capacity로 대체하지 않으며 설명용 공식 입력을 실측으로 취급하지 않는다.
+- 조건부 Operator Capacity는 높은 Busy/낮은 Backpressure/부하 균등성/유일 후보·복수 P의 직접 Counter 처리율·좁은 탐색 구간·자원 근거를 요구한다. Busy 근거만으로 CPU 원인을 확정하지 않는다. 실제 CPU/Throttle가 포화되면 고정 예산에서 다른 P로 Capacity를 전이할 수 없어 예측을 거부할 수 있다. 유효한 저성능 Run은 원시 결과로 보존한다.
+- 반복 통계는 VALID Run에 대해 역할/P/목표Rate/mode별로 계산한다. 평균 p99는 전체 이벤트 p99가 아니며 SD가 없는 1회 측정을 표준편차0으로 채우지 않는다. 자동 운영 추천은 등록한 SLO/Headroom/CPU/Checkpoint 조건에만 유효하고 전역 최소 P를 보장하지 않는다.
+- Phase 4의 병목 후보는 최대 Subtask Busy/낮은 Downstream 압력/타 Operator와의 차이에 따른 진단이다. 정확한 CPU 인과나 최초 병목의 자동 증명은 아니다. 의도한 후보가 없으면 가설 해석을 보류하고 실제 저성능/불확실 결과도 보존한다.
+- ThreadMXBean CPU 샘플은 Heavy/Keyed 동기 본문 비용만 포함한다. 전체 Task CPU %, GC/네트워크/mailbox 비용이나 다른 Operator를 대표하지 않는다. CPU 샘플링 비용/대표성/on-off 정량 비교는 미검증이다. Busy를 CPU로 변환하지 않는다.
+- 비교 전제는 별도 input_comparison_validity/Partition pair status로 저장한다. Kafka 쌍이 불균형하거나 Workload/실제 Graph/Seed/물리 예산이 다르면 공통 비교 차트를 보류한다. 생성된 키 분포와 이미 처리된 Count/Rate의 불균형은 Backpressure/미완료 코호트가 있을 때 다를 수 있다.
+- CPU core-seconds는 관측 Measurement snapshot 사이의 cgroup 차분이며 전체 구간으로 외삽하지 않는다. 실제 수집 커버리지가 다른 Case의 값만으로 자원 효율을 단정하지 않는다. Focused 저작업량 사전점검의 성공도 실제 Heavy Workload에서의 Source/다른 Operator 선포화를 보장하지 않는다.
+- userId와 Kafka Partition을 분리하므로 여러 Partition에서 온 같은 User의 이벤트가 Producer 전역 순서대로 도착한다고 보장하지 않는다. 누적 Count는 Keyed Operator의 실제 도착 순서 기준이며 전체/측정 코호트 건수 검증과 전역 eventId 순서 보장은 별개다.
+- Source 할당 Adapter는 실제 수락한 addSplits 목록을 관측한다. 단일 고정 Topic/Unbounded/Partition Discovery off/신규 State/Restart0에 한정한다. 동적 Topic/Partition 변경·bounded Split 종료·복구·동적 Source의 현재 Assignment를 추적하는 범용 구현이 아니다. REST frame은 원자적이지 않으며 Count/ID/전체 소유자/읽기 증거를 교차 확인한다.
+- pendingRecords는 Kafka Connector의 지연 등록 메트릭이며 미할당 Reader에서 Missing/Unsupported일 수 있다. Job 합계를 위해 결측 Reader를0으로 처리하지 않는다. 기본 noWatermarks에서 Event-time/Idle Source Watermark 영향을 측정하지 않았다.
+- 실험5의 Downstream P8/CPU0과 낮은 Busy는 그 Run의 비교 전제이며 다른 Rate에서의 여유 Capacity를 증명하지 않는다. Source 포화가 없는 낮은 동일 입력률에서 Source 처리량이 비슷하다는 사실로 Source의 최대 Capacity나 P8 이상 증설의 무효를 주장하지 않는다.
+- 전체 Suite/통합 리포트는 동일 Mode·선택된 Session Manifest를 보존하나 실험 간 Workload/Graph/Artifact 차이를 제거하지 않는다. 한 통합 리포트에 있는 서로 다른 실험의 처리량을 공통 성능 곡선/Capacity 추정으로 합치지 않는다. 실제 검증은 명시적 축소 Smoke 행렬에 한정될 수 있으며 Full/기본 전체 행렬은 validation.md에 따로 표시한다.

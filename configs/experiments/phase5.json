@@ -1,0 +1,9 @@
+{
+  "run_config": {"kafka_partitions": 8, "cpu_work_iterations": 0, "keyed_cpu_work_iterations": 0, "operator_cpu_sample_every": 0},
+  "downstream_parallelism": {"parse": 8, "heavy": 8, "aggregation": 8, "sink": 8},
+  "smoke": {"parallelisms": [2, 4, 8, 16], "repetitions": 1, "target_rate": 100, "random_order": false, "order_seed": 42,
+    "run_overrides": {"warmup_seconds": 3, "measurement_seconds": 10, "preflight_seconds": 5,
+      "sample_interval_seconds": 2, "drain_timeout_seconds": 30, "checkpoint_interval_ms": 1000}},
+  "full": {"parallelisms": [2, 4, 8, 16], "repetitions": 3, "target_rate": 1000, "random_order": true, "order_seed": 42, "run_overrides": {}},
+  "maximum_downstream_busy_ms_per_second": 750
+}

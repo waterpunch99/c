@@ -1,0 +1,129 @@
+name: flink-parallelism-lab
+x-flink: &flink
+  image: flink:2.2.1-scala_2.12-java17
+  volumes:
+    - ./flink-job/target:/opt/flink/usrlib:ro
+    - checkpoints:/checkpoints
+  environment:
+    FLINK_PROPERTIES: |
+      jobmanager.rpc.address: jobmanager
+      taskmanager.rpc.port: 6122
+      taskmanager.numberOfTaskSlots: 16
+      taskmanager.memory.process.size: 2048m
+      jobmanager.memory.process.size: 1024m
+      rest.bind-address: 0.0.0.0
+      metrics.fetcher.update-interval: 1000 ms
+      state.backend.type: hashmap
+      execution.checkpointing.dir: file:///checkpoints
+      restart-strategy.type: none
+services:
+  kafka-volume-init:
+    image: apache/kafka:4.2.1
+    user: "0:0"
+    entrypoint: [chown, "1000:1000", /kafka-data]
+    volumes:
+      - kafka-data:/kafka-data
+  checkpoint-init:
+    image: flink:2.2.1-scala_2.12-java17
+    user: "0:0"
+    entrypoint: [chown, "9999:9999", /checkpoints]
+    volumes:
+      - checkpoints:/checkpoints
+  kafka:
+    image: apache/kafka:4.2.1
+    cpus: 1.0
+    mem_limit: 1536m
+    depends_on:
+      kafka-volume-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:29092,EXTERNAL://:9092,CONTROLLER://:29093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_HEAP_OPTS: -Xms512m -Xmx512m
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka-data:/tmp/kraft-combined-logs
+    healthcheck:
+      test: [CMD-SHELL, "/opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 18
+      start_period: 20s
+  jobmanager:
+    <<: *flink
+    command: jobmanager
+    cpus: 0.5
+    mem_limit: 1536m
+    depends_on:
+      checkpoint-init:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8081:8081"
+    healthcheck:
+      test: [CMD-SHELL, "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8081; printf \"GET /overview HTTP/1.0\\r\\n\\r\\n\" >&3; read -r line <&3; [[ $$line == *200* ]]'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  taskmanager:
+    <<: *flink
+    command: taskmanager
+    cpus: 2.0
+    mem_limit: 2560m
+    depends_on:
+      jobmanager:
+        condition: service_healthy
+    healthcheck:
+      # RPC TCP liveness only. scripts/smoke_test.py checks registration/free slots.
+      test: [CMD-SHELL, "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6122'"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+  topic-init:
+    image: apache/kafka:4.2.1
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: [/opt/kafka/bin/kafka-topics.sh]
+    command: [--bootstrap-server, kafka:29092, --create, --if-not-exists, --topic, lab-events, --partitions, "32", --replication-factor, "1"]
+  builder:
+    image: maven:3.9.11-eclipse-temurin-17
+    profiles: [tools]
+    working_dir: /workspace/flink-job
+    volumes:
+      - .:/workspace
+      - maven-cache:/root/.m2
+    entrypoint: [mvn]
+    command: [-B, verify]
+  producer:
+    image: flink-parallelism-producer:phase2
+    build: ./load-generator
+    profiles: [tools]
+    cpus: 0.5
+    mem_limit: 512m
+    volumes:
+      - ./results:/results
+    entrypoint: [python, /app/producer.py]
+  analyzer:
+    image: flink-parallelism-analyzer:phase3
+    build: ./analysis
+    profiles: [tools]
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+volumes:
+  checkpoints:
+  kafka-data:
+  maven-cache:

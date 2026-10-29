@@ -1,0 +1,8 @@
+**/target/
+**/__pycache__/
+.venv/
+.tools/
+results/
+charts/
+*.pyc
+.env

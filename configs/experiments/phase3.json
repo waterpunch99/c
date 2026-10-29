@@ -1,0 +1,31 @@
+{
+  "run_config": {"kafka_partitions": 32, "cpu_work_iterations": 20000, "keyed_cpu_work_iterations": 1000},
+  "smoke": {
+    "parallelisms": [1, 2], "calibration_parallelisms": [1, 2], "repetitions": 1,
+    "minimum_rate": 10, "initial_rate": 100, "max_rate": 200, "growth_factor": 2,
+    "max_attempts": 1, "rate_relative_resolution": 0.1,
+    "fixed_input_rate": 100, "peak_input_rate": 100, "target_utilization": 0.7,
+    "uncalibrated_probe_parallelisms": [1, 2], "max_test_parallelism": 16,
+    "random_order": false, "order_seed": 42,
+    "run_overrides": {"warmup_seconds": 3, "measurement_seconds": 10, "preflight_seconds": 5,
+      "sample_interval_seconds": 2, "drain_timeout_seconds": 30, "checkpoint_interval_ms": 1000}
+  },
+  "full": {
+    "parallelisms": [1, 2, 4, 8, 16], "calibration_parallelisms": [2, 4, 8], "repetitions": 3,
+    "minimum_rate": 10, "initial_rate": 1000, "max_rate": 32000, "growth_factor": 2,
+    "max_attempts": 8, "rate_relative_resolution": 0.1,
+    "fixed_input_rate": 1000, "peak_input_rate": 4000, "target_utilization": 0.7,
+    "uncalibrated_probe_parallelisms": [], "max_test_parallelism": 16,
+    "random_order": true, "order_seed": 42, "run_overrides": {}
+  },
+  "evidence_thresholds": {
+    "minimum_busy_ms_per_second": 750, "maximum_backpressure_ms_per_second": 150,
+    "minimum_busy_margin_ms_per_second": 100, "maximum_subtask_rate_cv": 0.2,
+    "maximum_cross_parallelism_capacity_cv": 0.2, "minimum_calibration_parallelisms": 2,
+    "maximum_cpu_quota_utilization": 0.95, "maximum_throttled_period_ratio": 0.1,
+    "maximum_capacity_bracket_relative_width": 0.2,
+    "knee_relative_gain": 0.15
+  },
+  "operational_policy": {"latency_p99_slo_ms": 1000, "checkpoint_duration_slo_ms": 1000,
+    "maximum_cpu_quota_utilization": 0.85, "maximum_throttled_period_ratio": 0.1}
+}

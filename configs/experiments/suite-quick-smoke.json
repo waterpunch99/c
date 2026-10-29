@@ -1,0 +1,9 @@
+{
+  "random_order": true,
+  "order_seed": 7,
+  "experiments": {
+    "1": {"overrides": {"parallelisms": [1]}},
+    "2": {"overrides": {"calibration_parallelisms": [1], "uncalibrated_probe_parallelisms": [1]}},
+    "4": {"overrides": {"parallelisms": [2]}}
+  }
+}
